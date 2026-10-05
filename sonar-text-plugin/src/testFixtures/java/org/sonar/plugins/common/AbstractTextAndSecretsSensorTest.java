@@ -1405,10 +1405,16 @@ public abstract class AbstractTextAndSecretsSensorTest {
 
     var analyzedFile = inputFile(Path.of("a.txt"), "{}", "secrets");
 
-    var vendorKeys = CiVendorFilesTelemetry.CI_VENDOR_TO_REL_FILE_PATHS.keySet();
-    var ciInputFiles = CiVendorFilesTelemetry.CI_VENDOR_TO_REL_FILE_PATHS.values().stream().map(
-      relativePaths -> inputFile(Path.of(relativePaths.iterator().next()), "{}"));
-    var inputFiles = Stream.concat(Stream.of(analyzedFile), ciInputFiles).toArray(InputFile[]::new);
+    var vendorKeys = Stream.concat(CiVendorFilesTelemetry.CI_VENDOR_TO_REL_FILE_PATHS.keySet().stream(),
+      CiVendorFilesTelemetry.CI_VENDOR_TO_GLOB_PATTERNS.keySet().stream()).toList();
+    var relFiles = CiVendorFilesTelemetry.CI_VENDOR_TO_REL_FILE_PATHS.values().stream()
+      .map(p -> inputFile(Path.of(p.iterator().next()), "{}"));
+    var globFiles = CiVendorFilesTelemetry.CI_VENDOR_TO_GLOB_PATTERNS.values().stream()
+      .map(p -> {
+        var name = p.iterator().next().substring("**/".length());
+        return inputFile(Path.of("sub", name.startsWith("*") ? "main" + name.substring(1) : name), "{}");
+      });
+    var inputFiles = Stream.of(Stream.of(analyzedFile), relFiles, globFiles).flatMap(s -> s).toArray(InputFile[]::new);
 
     analyse(sensor, context, inputFiles);
 
@@ -1425,7 +1431,8 @@ public abstract class AbstractTextAndSecretsSensorTest {
     var context = spy(sensorContext(check, binaryCheck));
     var sensor = sensor(check, binaryCheck);
 
-    var vendorKeys = CiVendorFilesTelemetry.CI_VENDOR_TO_REL_FILE_PATHS.keySet();
+    var vendorKeys = Stream.concat(CiVendorFilesTelemetry.CI_VENDOR_TO_REL_FILE_PATHS.keySet().stream(),
+      CiVendorFilesTelemetry.CI_VENDOR_TO_GLOB_PATTERNS.keySet().stream()).toList();
 
     var analyzedFile = inputFile(Path.of("a.txt"), "{}", "secrets");
     analyse(sensor, context, analyzedFile);
